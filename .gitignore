@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Personal data - NEVER commit real profile data to this public repo.
+# These files hold real PII (name, email, phone, address, DOB, EEO
+# self-identification fields) used to autofill job applications locally -
+# they have no business being in git history, public repo or not.
+complete-profile-dataset.json
+src/complete-profile-dataset.json
+src/learned-profile-data.json
+
+# Build/test artifacts
+test-results/
+playwright-report/
+sw.log
+*.zip
+
+# Graphify's own working state - regenerable, and its cache/backups churn
+# on every run, which would otherwise spam every commit's diff.
+graphify-out/
+
+# Editor/OS cruft
+.DS_Store
+Thumbs.db

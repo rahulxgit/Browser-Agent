@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Browser Agent Settings</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      max-width: 480px;
+      margin: 40px auto;
+      color: #1a1a1a;
+    }
+    h1 { font-size: 18px; }
+    label {
+      display: block;
+      margin-top: 14px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 8px;
+      margin-top: 4px;
+      box-sizing: border-box;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    textarea { height: 140px; font-family: monospace; }
+    button {
+      margin-top: 18px;
+      padding: 10px 16px;
+      background: #1a1a1a;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .hint { font-size: 11px; color: #666; margin-top: 4px; }
+    .hint.warning { color: #a15c00; }
+    #status { margin-top: 10px; font-size: 12px; color: green; }
+    #status.error { color: #c0392b; }
+    textarea.invalid, input.invalid { border-color: #c0392b; }
+  </style>
+</head>
+<body>
+  <h1>Browser Agent Settings</h1>
+
+  <label>Connection mode</label>
+  <select id="mode">
+    <option value="gemini">Direct Gemini API key (free tier)</option>
+    <option value="anthropic">Direct Anthropic API key</option>
+    <option value="gateway">My AI Gateway</option>
+  </select>
+
+  <div id="anthropicFields">
+    <label>Anthropic API key</label>
+    <input id="apiKeyAnthropic" type="password" placeholder="sk-ant-..." />
+    <div class="hint">Stored only for this browser session and sent only to Anthropic.</div>
+  </div>
+
+  <div id="geminiFields">
+    <label>Gemini API key</label>
+    <input id="apiKeyGemini" type="password" placeholder="AIza..." />
+    <div class="hint">Free from <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a>. Stored only for this browser session and sent only to Google.</div>
+  </div>
+
+  <div id="gatewayFields" style="display:none">
+    <label>Gateway URL</label>
+    <input id="gatewayUrl" type="text" placeholder="https://your-ai-gateway.onrender.com" />
+
+    <label>Task type</label>
+    <select id="taskType">
+      <option value="reasoning">reasoning (default - best for careful step-by-step decisions)</option>
+      <option value="coding">coding</option>
+      <option value="fast">fast (cheaper/quicker, less careful)</option>
+      <option value="cheap">cheap</option>
+      <option value="creative">creative</option>
+      <option value="large-context">large-context</option>
+      <option value="general">general</option>
+    </select>
+    <div class="hint">Routes to whichever provider your gateway prefers for that task type. "reasoning" is the safest default for an agent picking actions on a page.</div>
+  </div>
+
+  <div id="modelSection">
+    <label>Model</label>
+    <input id="model" type="text" placeholder="e.g. gemini-3.5-flash-lite or claude-sonnet-4-6" />
+    <div class="hint" id="modelHint"></div>
+  </div>
+
+  <label>Profile data (JSON)</label>
+  <textarea id="profileData" placeholder='{"name": "...", "email": "...", "phone": "..."}'></textarea>
+  <div class="hint">Structured, form-ready facts. These take priority over matching values in the complete dataset.</div>
+
+  <label>Complete profile dataset (JSON)</label>
+  <textarea id="completeDataset" placeholder='{"projects": [], "skills": [], "experience": [], "achievements": []}'></textarea>
+  <div class="hint">Seeded from <code>src/complete-profile-dataset.json</code>, but editing here saves to Chrome storage - installed extension files can't be rewritten at runtime, so this box is the real source of truth after your first edit.</div>
+  <button id="saveCompleteDataset" type="button">Save dataset</button>
+  <button id="resetCompleteDataset" type="button" style="background:#eee;color:#1a1a1a;">Reset to packaged default</button>
+
+  <label>Learned profile data (live, confirmed values)</label>
+  <textarea id="learnedProfile" placeholder="Confirmed values you save while filling forms appear here."></textarea>
+  <div class="hint">Auto-updated whenever you confirm a "Save this?" prompt while filling a form. You can also edit this directly - useful for fixing a badly-named auto-learned key or removing a stale value.</div>
+  <button id="saveLearnedProfile" type="button">Save learned data</button>
+
+  <label>Backup &amp; restore</label>
+  <div class="hint">Everything above lives only in this browser's extension storage, not as a file on disk. Export it to a JSON file you control, and import it back here (or on another machine) whenever you like.</div>
+  <button id="exportAll" type="button">Export all profile data (.json)</button>
+  <input id="importFile" type="file" accept="application/json" style="margin-top:8px;" />
+
+  <label style="display:flex; align-items:center; gap:8px; margin-top:16px;">
+    <input type="checkbox" id="persistApiKey" style="width:auto; margin:0;" />
+    Persist API key across browser restarts
+  </label>
+  <div class="hint">Recommended for convenience. Default is off (session-only memory).</div>
+  <label style="display:flex; align-items:center; gap:8px; margin-top:16px;">
+    <input type="checkbox" id="pauseBeforeSubmit" style="width:auto; margin:0;" />
+    Pause before submit-like actions (recommended)
+  </label>
+  <div class="hint">Stops and asks for confirmation before clicking Submit, Apply, Pay, Delete, or similar. Off is not recommended for real applications.</div>
+
+  <button id="save">Save</button>
+  <div id="status"></div>
+
+  <script src="options.js"></script>
+</body>
+</html>

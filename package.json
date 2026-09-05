@@ -1,0 +1,19 @@
+{
+  "name": "browser-agent-dev",
+  "private": true,
+  "version": "0.8.8",
+  "description": "Dev-only tooling for the Browser Agent Chrome extension. Not part of the extension bundle itself - manifest.json + src/ are what actually gets loaded into Chrome.",
+  "scripts": {
+    "test": "node tests/dropdown-helpers.test.js && node tests/hardening.test.js",
+    "test:fixtures": "playwright test tests/fixtures",
+    "test:extension": "playwright test --config=playwright.extension.config.js",
+    "lint": "eslint .",
+    "format": "prettier --write eslint.config.js package.json .github/workflows/test.yml schemas/profile.schema.json src/lib/storage-manager.js src/lib/sensitive-data-policy.js src/lib/answer-memory.js src/lib/run-state-manager.js src/lib/host-utils.js src/lib/action-schema.js src/lib/error-codes.js tests/hardening.test.js",
+    "format:check": "prettier --check eslint.config.js package.json .github/workflows/test.yml schemas/profile.schema.json src/lib/storage-manager.js src/lib/sensitive-data-policy.js src/lib/answer-memory.js src/lib/run-state-manager.js src/lib/host-utils.js src/lib/action-schema.js src/lib/error-codes.js tests/hardening.test.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0"
+  }
+}
