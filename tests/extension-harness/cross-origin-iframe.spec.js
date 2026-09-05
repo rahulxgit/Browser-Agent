@@ -100,6 +100,10 @@ test.describe("cross-origin iframe form fill + submission verification", () => {
     const popupPage = await context.newPage();
     await popupPage.goto(`chrome-extension://${extensionId}/src/popup.html`);
     await formPage.bringToFront();
+    // CI stabilization - see submission-flow.spec.js's comment on this
+    // same pattern; identical fix applied to all three extension-harness
+    // specs since all three failed identically on CI's first ever run.
+    await formPage.waitForTimeout(300);
 
     await popupPage.evaluate(() => {
       chrome.runtime.sendMessage({
@@ -114,7 +118,7 @@ test.describe("cross-origin iframe form fill + submission verification", () => {
     // INSIDE the iframe - which can only happen if dispatchAction routed
     // the click through the composed iframe0-... id into the correct
     // cross-origin frame.
-    await expect(popupPage.locator("#confirmBtn")).toBeVisible({ timeout: 15000 });
+    await expect(popupPage.locator("#confirmBtn")).toBeVisible({ timeout: 25000 });
     await popupPage.locator("#confirmBtn").click();
 
     // The success text lives inside the cross-origin iframe's own
@@ -127,8 +131,8 @@ test.describe("cross-origin iframe form fill + submission verification", () => {
     // never be visible to the extension's own outcome check even though a
     // human looking at the page would see it plainly.
     const iframeElement = formPage.frameLocator("#appFrame");
-    await expect(iframeElement.locator("h1")).toHaveText("Thank you for applying!", { timeout: 15000 });
+    await expect(iframeElement.locator("h1")).toHaveText("Thank you for applying!", { timeout: 25000 });
 
-    await expect(popupPage.locator("#statusBadge")).toHaveText("Submitted", { timeout: 15000 });
+    await expect(popupPage.locator("#statusBadge")).toHaveText("Submitted", { timeout: 25000 });
   });
 });

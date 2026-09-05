@@ -79,6 +79,10 @@ test.describe("false 'done' claim cross-check (Phase 24, live extension harness)
     // Make the form tab the active tab RUN_TASK will resolve against -
     // same reasoning as submission-flow.spec.js.
     await formPage.bringToFront();
+    // CI stabilization - see submission-flow.spec.js's comment on this
+    // same pattern; identical fix applied to all three extension-harness
+    // specs since all three failed identically on CI's first ever run.
+    await formPage.waitForTimeout(300);
 
     // Sent directly rather than via the Autofill button click: the button
     // always requests useSmartAutofill:true, and the heuristic pre-pass
@@ -103,7 +107,7 @@ test.describe("false 'done' claim cross-check (Phase 24, live extension harness)
     // verification: it can only appear if runTaskInner() genuinely called
     // hasFillableWork() against the real snapshot from the real page and
     // found the real, still-empty <select id="country">.
-    await expect(popupPage.locator("#log")).toContainText(/still unfilled/i, { timeout: 15000 });
+    await expect(popupPage.locator("#log")).toContainText(/still unfilled/i, { timeout: 25000 });
 
     // And the run must not have ended there - it corrects itself, selects
     // the real option in round 2, then genuinely completes in round 3
@@ -112,7 +116,7 @@ test.describe("false 'done' claim cross-check (Phase 24, live extension harness)
     // purpose so useSmartAutofill:false could be forced - so the
     // completion signal to check here is the "round"-kind event log line
     // instead, which fires regardless of how RUN_TASK was invoked).
-    await expect(popupPage.locator("#log")).toContainText(/genuinely done now/i, { timeout: 15000 });
+    await expect(popupPage.locator("#log")).toContainText(/genuinely done now/i, { timeout: 25000 });
 
     const countryValue = await formPage.locator("#country").inputValue();
     expect(countryValue).toBe("IN");

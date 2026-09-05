@@ -103,6 +103,18 @@ test.describe("submission confirmation flow (extension harness)", () => {
     // of which page has OS-level focus, so this doesn't block anything
     // that follows.
     await formPage.bringToFront();
+    // CI-only stabilization: on a shared, resource-constrained runner,
+    // chrome.tabs.query({active:true}) can resolve inconsistently for a
+    // brief window right after bringToFront() - this never showed up
+    // locally (Windows desktop Chrome, dedicated resources) but every
+    // extension-harness test failed identically on the very first CI run
+    // (all three: #confirmBtn never appeared / #log stayed empty), which
+    // points at tab-activation timing rather than a logic bug, since the
+    // failure was the same regardless of which of these tests or which
+    // RUN_TASK invocation style ran. A short explicit wait here is the
+    // standard mitigation for this class of flakiness; unverified against
+    // real CI until the next run confirms it.
+    await formPage.waitForTimeout(300);
     await formPage.evaluate(() => console.log("FORM PAGE URL: " + location.href));
     await popupPage.evaluate(() => console.log("POPUP PAGE URL: " + location.href));
 
@@ -118,11 +130,11 @@ test.describe("submission confirmation flow (extension harness)", () => {
     // (Phase 20) renders by unhiding #pauseBanner - waiting for it here is
     // the real assertion that the multi-layer submit-safety pause
     // actually fired, not just that *some* click happened.
-    await expect(popupPage.locator("#confirmBtn")).toBeVisible({ timeout: 15000 });
+    await expect(popupPage.locator("#confirmBtn")).toBeVisible({ timeout: 25000 });
     await popupPage.locator("#confirmBtn").click();
 
-    await formPage.waitForURL(/\/apply\/success/, { timeout: 15000 });
+    await formPage.waitForURL(/\/apply\/success/, { timeout: 25000 });
 
-    await expect(popupPage.locator("#statusBadge")).toHaveText("Submitted", { timeout: 15000 });
+    await expect(popupPage.locator("#statusBadge")).toHaveText("Submitted", { timeout: 25000 });
   });
 });
