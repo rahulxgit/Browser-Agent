@@ -27,21 +27,23 @@ async function launchWithExtension() {
     ]
   });
 
-  // The background service worker registers asynchronously - if it's
-  // already there by the time we check (context.serviceWorkers() is
-  // non-empty), use it directly; otherwise wait for the 'serviceworker'
-  // event. Its URL is chrome-extension://<id>/... , which is also how the
-  // extension ID itself gets discovered (nothing exposes it more directly).
+  // Logging straight to console.log (not a local sw.log file) on purpose:
+  // sw.log is gitignored and invisible in CI, which is exactly why the
+  // first two CI runs of the extension-harness suite gave zero insight
+  // into WHY every test failed identically (RUN_TASK visibly doing
+  // nothing at all, not just doing it slowly - confirmed by bumping the
+  // timeout from 15s to 25s with literally zero change in outcome).
+  // console.log here lands directly in the CI job's own log output.
   context.on('serviceworker', async worker => {
-    const fs = require('fs');
-    fs.appendFileSync('sw.log', 'Service worker created: ' + worker.url() + '\n');
-    worker.on('console', msg => fs.appendFileSync('sw.log', 'SW log: ' + msg.text() + '\n'));
-    worker.on('pageerror', err => fs.appendFileSync('sw.log', 'SW error: ' + err + '\n'));
+    console.log('[sw] Service worker created: ' + worker.url());
+    worker.on('console', msg => console.log('[sw console] ' + msg.text()));
+    worker.on('pageerror', err => console.log('[sw error] ' + err));
   });
 
   context.on('page', page => {
-    page.on('console', msg => fs.appendFileSync('sw.log', 'Page log: ' + msg.text() + '\n'));
-    page.on('pageerror', err => fs.appendFileSync('sw.log', 'Page error: ' + err + '\n'));
+    console.log('[page] opened: ' + page.url());
+    page.on('console', msg => console.log('[page console] ' + msg.text()));
+    page.on('pageerror', err => console.log('[page error] ' + err));
   });
 
   let serviceWorker = context.serviceWorkers()[0];
@@ -49,11 +51,10 @@ async function launchWithExtension() {
     serviceWorker = await context.waitForEvent("serviceworker", { timeout: 10000 });
   }
 
-  const fs = require('fs');
-  fs.appendFileSync('sw.log', 'SW found: ' + serviceWorker.url() + '\n');
-  serviceWorker.on('console', msg => fs.appendFileSync('sw.log', 'SW log: ' + msg.text() + '\n'));
-  serviceWorker.on('pageerror', err => fs.appendFileSync('sw.log', 'SW error: ' + err + '\n'));
-  
+  console.log('[sw] SW found: ' + serviceWorker.url());
+  serviceWorker.on('console', msg => console.log('[sw console] ' + msg.text()));
+  serviceWorker.on('pageerror', err => console.log('[sw error] ' + err));
+
   const extensionId = serviceWorker.url().split("/")[2];
 
   return { context, serviceWorker, extensionId };
