@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Browser Agent",
-  "version": "0.8.8",
+  "version": "0.8.9",
   "minimum_chrome_version": "114",
   "description": "Supervised job-form drafting: local profile autofill, tailored answers, and a review pause before submission.",
   "permissions": [

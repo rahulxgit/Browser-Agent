@@ -135,7 +135,21 @@ let packagedDataPromise;
 
 async function readPackagedJson(path) {
   const response = await fetch(chrome.runtime.getURL(path));
-  if (!response.ok) throw new Error(`Could not read ${path}`);
+  // A missing packaged file is a VALID state, not an error condition -
+  // complete-profile-dataset.json and learned-profile-data.json hold real
+  // personal data and are deliberately excluded from the public repo (see
+  // .gitignore), so any checkout that isn't the developer's own machine
+  // (CI, a fresh clone, a stripped build) genuinely won't have them. This
+  // used to throw on a 404, which rejected the memoized packagedDataPromise
+  // permanently (getPackagedData() caches its promise and never retries) -
+  // every future getSettings() call then hung/rejected silently forever,
+  // taking the entire RUN_TASK flow down with it. Confirmed live: this was
+  // the actual root cause of every extension-harness test failing 100% in
+  // CI with zero errors surfaced anywhere, traced via a chain of
+  // checkpoint logging down from the onMessage listener through
+  // runTask -> getSettings -> getPackagedData. Falling back to an empty
+  // profile is exactly what "no profile configured yet" should look like.
+  if (!response.ok) return {};
   const value = await response.json();
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
@@ -1208,15 +1222,11 @@ async function dismissLearnedValue(fieldSignature) {
 }
 
 async function runTask(tabId, task, onEvent, options = {}) {
-  console.log("[runTask] start, calling getSettings()");
   const settings = await getSettings();
-  console.log("[runTask] getSettings() resolved");
 
   const recording = await isRecordModeOn();
-  console.log("[runTask] isRecordModeOn() resolved:", recording);
   const runId = `run-${Date.now()}-${crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)}`;
   await RunStateManager.put({ runId, tabId, status: "running", round: 0, actionIndex: 0, pendingAction: null });
-  console.log("[runTask] RunStateManager.put() resolved");
   onEvent({ kind: "started", runId });
 
   if (recording) {
@@ -1224,7 +1234,6 @@ async function runTask(tabId, task, onEvent, options = {}) {
   }
 
   startKeepalive(); // held for the whole task, not just one round - see keepalive block above
-  console.log("[runTask] about to call runTaskInner");
   try {
     return await runTaskInner(tabId, task, onEvent, options, settings, recording, runId);
   } catch (err) {
@@ -1322,14 +1331,7 @@ function validateAction(action, snapshot) {
 }
 
 async function runTaskInner(tabId, task, onEvent, options, settings, recording, runId) {
-  // TEMPORARY diagnostic for a CI-only failure (extension-harness suite
-  // passes 100% locally on Windows desktop Chrome, fails 100% on Ubuntu
-  // headless CI with zero errors and zero events fired - consistent with
-  // this exact guard clause returning silently). Remove once the CI run
-  // confirms or rules this out.
-  console.log(`[runTaskInner] apiKey present: ${!!settings.apiKey} (len ${settings.apiKey ? settings.apiKey.length : 0}), gatewayUrl present: ${!!settings.gatewayUrl}, provider: ${settings.provider}`);
   if (!settings.apiKey && !settings.gatewayUrl) {
-    console.log("[runTaskInner] returning early: no apiKey and no gatewayUrl");
     return { ok: false, summary: "No API key or gateway URL set. Open extension options first." };
   }
 
@@ -2254,13 +2256,6 @@ async function runTaskInner(tabId, task, onEvent, options, settings, recording, 
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  // TEMPORARY diagnostic - see the matching note in runTaskInner. Confirms
-  // whether RUN_TASK is even reaching this listener at all in CI, since
-  // the previous diagnostic round showed zero output anywhere past the
-  // test's own tab-query log, including my new .catch() on the RUN_TASK
-  // chain - which would only be silent if the message never got here.
-  console.log(`[onMessage] received: ${msg.type}`);
-
   if (msg.type === "GET_DEFAULT_COMPLETE_DATASET") {
     getPackagedData().then(({ complete }) => sendResponse(complete));
     return true;

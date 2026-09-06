@@ -1,7 +1,7 @@
 {
   "name": "browser-agent-dev",
   "private": true,
-  "version": "0.8.8",
+  "version": "0.8.9",
   "description": "Dev-only tooling for the Browser Agent Chrome extension. Not part of the extension bundle itself - manifest.json + src/ are what actually gets loaded into Chrome.",
   "scripts": {
     "test": "node tests/dropdown-helpers.test.js && node tests/hardening.test.js",

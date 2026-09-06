@@ -235,3 +235,54 @@ test("hitting MAX_ROUNDS reports which fields are still unresolved, not just a f
     "the round-limit summary should name the specific fields still blocking, not just a flat 'didn't finish' message"
   );
 });
+
+// Regression for a genuine, self-inflicted CI outage traced live: a
+// missing packaged complete-profile-dataset.json / learned-profile-data.json
+// (deliberately gitignored - they hold real PII) used to make
+// readPackagedJson() throw on the resulting 404, which permanently
+// rejected the memoized packagedDataPromise in getPackagedData() - every
+// subsequent getSettings() call then hung/rejected silently forever, and
+// with it the entire RUN_TASK flow, with zero errors surfaced anywhere in
+// the UI or logs. Traced via checkpoint logging down through
+// onMessage -> runTask -> getSettings -> getPackagedData across several
+// live CI runs (see git history) before landing on this exact line. A
+// missing packaged file is a legitimate state (fresh install, stripped
+// build, or exactly this repo's own CI checkout) and must resolve to an
+// empty profile, not blow up the whole extension.
+test("a missing packaged profile file resolves to an empty object instead of throwing", () => {
+  const fs = require("fs");
+  const src = fs.readFileSync(require("path").join(__dirname, "..", "src", "background.js"), "utf8");
+  assert.match(
+    src,
+    /if \(!response\.ok\) return \{\};/,
+    "readPackagedJson must treat a missing/404 packaged file as 'no profile yet', not throw"
+  );
+  assert.doesNotMatch(
+    src,
+    /if \(!response\.ok\) throw new Error\(`Could not read \$\{path\}`\);/,
+    "the old throw-on-missing-file behavior must not come back - it silently hung the entire RUN_TASK flow"
+  );
+});
+
+// Regression for a real robustness gap in the RUN_TASK handler: the
+// chrome.tabs.query({active:true}).then(async ([tab]) => {...}) chain had
+// no .catch() at all, and referenced tab.id before any null-check - an
+// empty query result (no tab resolves as active+currentWindow, seen live
+// in CI's multi-page harness) threw a TypeError as an unhandled promise
+// rejection, with sendResponse() never called and no error surfaced
+// anywhere. A real user could hit the same empty-query case in ordinary
+// multi-window use, not just in CI.
+test("RUN_TASK handles an empty active-tab query result and never leaves the promise chain unhandled", () => {
+  const fs = require("fs");
+  const src = fs.readFileSync(require("path").join(__dirname, "..", "src", "background.js"), "utf8");
+  assert.match(
+    src,
+    /if \(!tab\) \{\s*sendResponse\(\{ ok: false, summary: "Could not find an active tab/,
+    "an empty tabs.query result must be guarded before touching tab.id, with a real response sent back"
+  );
+  assert.match(
+    src,
+    /chrome\.tabs\.query\(\{ active: true, currentWindow: true \}\)\.then\(async \(\[tab\]\) => \{[\s\S]{0,2000}\}\)\.catch\(\(err\) => \{/,
+    "the RUN_TASK promise chain must have a .catch() so no future failure here goes silent again"
+  );
+});
