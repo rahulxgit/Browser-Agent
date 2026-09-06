@@ -2249,6 +2249,13 @@ async function runTaskInner(tabId, task, onEvent, options, settings, recording, 
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  // TEMPORARY diagnostic - see the matching note in runTaskInner. Confirms
+  // whether RUN_TASK is even reaching this listener at all in CI, since
+  // the previous diagnostic round showed zero output anywhere past the
+  // test's own tab-query log, including my new .catch() on the RUN_TASK
+  // chain - which would only be silent if the message never got here.
+  console.log(`[onMessage] received: ${msg.type}`);
+
   if (msg.type === "GET_DEFAULT_COMPLETE_DATASET") {
     getPackagedData().then(({ complete }) => sendResponse(complete));
     return true;
