@@ -1208,11 +1208,15 @@ async function dismissLearnedValue(fieldSignature) {
 }
 
 async function runTask(tabId, task, onEvent, options = {}) {
+  console.log("[runTask] start, calling getSettings()");
   const settings = await getSettings();
+  console.log("[runTask] getSettings() resolved");
 
   const recording = await isRecordModeOn();
+  console.log("[runTask] isRecordModeOn() resolved:", recording);
   const runId = `run-${Date.now()}-${crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)}`;
   await RunStateManager.put({ runId, tabId, status: "running", round: 0, actionIndex: 0, pendingAction: null });
+  console.log("[runTask] RunStateManager.put() resolved");
   onEvent({ kind: "started", runId });
 
   if (recording) {
@@ -1220,6 +1224,7 @@ async function runTask(tabId, task, onEvent, options = {}) {
   }
 
   startKeepalive(); // held for the whole task, not just one round - see keepalive block above
+  console.log("[runTask] about to call runTaskInner");
   try {
     return await runTaskInner(tabId, task, onEvent, options, settings, recording, runId);
   } catch (err) {
