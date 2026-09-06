@@ -238,29 +238,31 @@ test("hitting MAX_ROUNDS reports which fields are still unresolved, not just a f
 
 // Regression for a genuine, self-inflicted CI outage traced live: a
 // missing packaged complete-profile-dataset.json / learned-profile-data.json
-// (deliberately gitignored - they hold real PII) used to make
-// readPackagedJson() throw on the resulting 404, which permanently
-// rejected the memoized packagedDataPromise in getPackagedData() - every
-// subsequent getSettings() call then hung/rejected silently forever, and
-// with it the entire RUN_TASK flow, with zero errors surfaced anywhere in
-// the UI or logs. Traced via checkpoint logging down through
-// onMessage -> runTask -> getSettings -> getPackagedData across several
-// live CI runs (see git history) before landing on this exact line. A
-// missing packaged file is a legitimate state (fresh install, stripped
-// build, or exactly this repo's own CI checkout) and must resolve to an
-// empty profile, not blow up the whole extension.
+// (deliberately gitignored - they hold real PII) reached fetch() on a
+// chrome-extension:// URL that doesn't exist in that checkout. Confirmed
+// live via diagnostic logging across several CI runs: this REJECTS
+// outright with "TypeError: Failed to fetch" - it does NOT resolve with a
+// 404 Response the way a normal http(s) fetch would. An earlier fix that
+// only checked response.ok therefore never even ran; the actual fix has
+// to be a try/catch around the fetch() call itself. That rejection used
+// to propagate through the memoized packagedDataPromise in
+// getPackagedData(), permanently wedging every future getSettings() call
+// - and with it the entire RUN_TASK flow - with zero errors surfaced
+// anywhere. A missing packaged file is a legitimate state (fresh install,
+// stripped build, or exactly this repo's own CI checkout) and must
+// resolve to an empty profile, not take down the extension.
 test("a missing packaged profile file resolves to an empty object instead of throwing", () => {
   const fs = require("fs");
   const src = fs.readFileSync(require("path").join(__dirname, "..", "src", "background.js"), "utf8");
   assert.match(
     src,
-    /if \(!response\.ok\) return \{\};/,
-    "readPackagedJson must treat a missing/404 packaged file as 'no profile yet', not throw"
+    /try \{\s*response = await fetch\(chrome\.runtime\.getURL\(path\)\);\s*\} catch \{/,
+    "fetch() itself must be wrapped in try/catch - it rejects outright on a missing bundled file, it does not resolve with a 404 Response"
   );
-  assert.doesNotMatch(
+  assert.match(
     src,
-    /if \(!response\.ok\) throw new Error\(`Could not read \$\{path\}`\);/,
-    "the old throw-on-missing-file behavior must not come back - it silently hung the entire RUN_TASK flow"
+    /if \(!response\.ok\) return \{\};/,
+    "a non-ok response (if one is ever returned) must also resolve to an empty object, not throw"
   );
 });
 

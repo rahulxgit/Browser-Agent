@@ -134,29 +134,28 @@ const LEARNED_DATA_PATH = "src/learned-profile-data.json";
 let packagedDataPromise;
 
 async function readPackagedJson(path) {
-  console.log(`[diag] readPackagedJson fetching: ${path}`);
   let response;
   try {
     response = await fetch(chrome.runtime.getURL(path));
-    console.log(`[diag] readPackagedJson fetch resolved for ${path}, ok=${response.ok}, status=${response.status}`);
-  } catch (fetchErr) {
-    console.log(`[diag] readPackagedJson fetch THREW for ${path}:`, fetchErr);
+  } catch {
+    // A missing packaged file is a VALID state, not an error condition -
+    // complete-profile-dataset.json and learned-profile-data.json hold
+    // real personal data and are deliberately excluded from the public
+    // repo (see .gitignore), so any checkout that isn't the developer's
+    // own machine (CI, a fresh clone, a stripped build) genuinely won't
+    // have them. fetch() on a missing chrome-extension:// resource
+    // REJECTS outright with "TypeError: Failed to fetch" - it does NOT
+    // resolve with a 404 Response the way a normal http(s) fetch would -
+    // confirmed live via diagnostic logging (see git history) after an
+    // earlier fix that only checked `response.ok` never actually ran,
+    // since the throw happens on the fetch() call itself. This rejection
+    // used to propagate all the way up through the memoized
+    // packagedDataPromise in getPackagedData(), permanently wedging every
+    // future getSettings() call - and with it the entire RUN_TASK flow -
+    // with zero errors surfaced anywhere. Confirmed as the actual root
+    // cause of every extension-harness test failing 100% in CI.
     return {};
   }
-  // A missing packaged file is a VALID state, not an error condition -
-  // complete-profile-dataset.json and learned-profile-data.json hold real
-  // personal data and are deliberately excluded from the public repo (see
-  // .gitignore), so any checkout that isn't the developer's own machine
-  // (CI, a fresh clone, a stripped build) genuinely won't have them. This
-  // used to throw on a 404, which rejected the memoized packagedDataPromise
-  // permanently (getPackagedData() caches its promise and never retries) -
-  // every future getSettings() call then hung/rejected silently forever,
-  // taking the entire RUN_TASK flow down with it. Confirmed live: this was
-  // the actual root cause of every extension-harness test failing 100% in
-  // CI with zero errors surfaced anywhere, traced via a chain of
-  // checkpoint logging down from the onMessage listener through
-  // runTask -> getSettings -> getPackagedData. Falling back to an empty
-  // profile is exactly what "no profile configured yet" should look like.
   if (!response.ok) return {};
   const value = await response.json();
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -1230,9 +1229,7 @@ async function dismissLearnedValue(fieldSignature) {
 }
 
 async function runTask(tabId, task, onEvent, options = {}) {
-  console.log("[diag] runTask start");
   const settings = await getSettings();
-  console.log("[diag] getSettings resolved, apiKey present:", !!settings.apiKey);
 
   const recording = await isRecordModeOn();
   const runId = `run-${Date.now()}-${crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)}`;
@@ -1244,7 +1241,6 @@ async function runTask(tabId, task, onEvent, options = {}) {
   }
 
   startKeepalive(); // held for the whole task, not just one round - see keepalive block above
-  console.log("[diag] about to call runTaskInner");
   try {
     return await runTaskInner(tabId, task, onEvent, options, settings, recording, runId);
   } catch (err) {
@@ -1342,9 +1338,7 @@ function validateAction(action, snapshot) {
 }
 
 async function runTaskInner(tabId, task, onEvent, options, settings, recording, runId) {
-  console.log("[diag] runTaskInner entered");
   if (!settings.apiKey && !settings.gatewayUrl) {
-    console.log("[diag] runTaskInner early-return: no apiKey/gatewayUrl");
     return { ok: false, summary: "No API key or gateway URL set. Open extension options first." };
   }
 
