@@ -134,7 +134,15 @@ const LEARNED_DATA_PATH = "src/learned-profile-data.json";
 let packagedDataPromise;
 
 async function readPackagedJson(path) {
-  const response = await fetch(chrome.runtime.getURL(path));
+  console.log(`[diag] readPackagedJson fetching: ${path}`);
+  let response;
+  try {
+    response = await fetch(chrome.runtime.getURL(path));
+    console.log(`[diag] readPackagedJson fetch resolved for ${path}, ok=${response.ok}, status=${response.status}`);
+  } catch (fetchErr) {
+    console.log(`[diag] readPackagedJson fetch THREW for ${path}:`, fetchErr);
+    return {};
+  }
   // A missing packaged file is a VALID state, not an error condition -
   // complete-profile-dataset.json and learned-profile-data.json hold real
   // personal data and are deliberately excluded from the public repo (see
