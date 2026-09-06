@@ -1222,7 +1222,9 @@ async function dismissLearnedValue(fieldSignature) {
 }
 
 async function runTask(tabId, task, onEvent, options = {}) {
+  console.log("[diag] runTask start");
   const settings = await getSettings();
+  console.log("[diag] getSettings resolved, apiKey present:", !!settings.apiKey);
 
   const recording = await isRecordModeOn();
   const runId = `run-${Date.now()}-${crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)}`;
@@ -1234,6 +1236,7 @@ async function runTask(tabId, task, onEvent, options = {}) {
   }
 
   startKeepalive(); // held for the whole task, not just one round - see keepalive block above
+  console.log("[diag] about to call runTaskInner");
   try {
     return await runTaskInner(tabId, task, onEvent, options, settings, recording, runId);
   } catch (err) {
@@ -1331,7 +1334,9 @@ function validateAction(action, snapshot) {
 }
 
 async function runTaskInner(tabId, task, onEvent, options, settings, recording, runId) {
+  console.log("[diag] runTaskInner entered");
   if (!settings.apiKey && !settings.gatewayUrl) {
+    console.log("[diag] runTaskInner early-return: no apiKey/gatewayUrl");
     return { ok: false, summary: "No API key or gateway URL set. Open extension options first." };
   }
 
