@@ -1317,7 +1317,14 @@ function validateAction(action, snapshot) {
 }
 
 async function runTaskInner(tabId, task, onEvent, options, settings, recording, runId) {
+  // TEMPORARY diagnostic for a CI-only failure (extension-harness suite
+  // passes 100% locally on Windows desktop Chrome, fails 100% on Ubuntu
+  // headless CI with zero errors and zero events fired - consistent with
+  // this exact guard clause returning silently). Remove once the CI run
+  // confirms or rules this out.
+  console.log(`[runTaskInner] apiKey present: ${!!settings.apiKey} (len ${settings.apiKey ? settings.apiKey.length : 0}), gatewayUrl present: ${!!settings.gatewayUrl}, provider: ${settings.provider}`);
   if (!settings.apiKey && !settings.gatewayUrl) {
+    console.log("[runTaskInner] returning early: no apiKey and no gatewayUrl");
     return { ok: false, summary: "No API key or gateway URL set. Open extension options first." };
   }
 
@@ -2427,6 +2434,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === "RUN_TASK") {
     chrome.tabs.query({ active: true, currentWindow: true }).then(async ([tab]) => {
+      // A bare `[tab]` destructure with no guard meant an empty query
+      // result (no tab matched active+currentWindow - possible with
+      // multi-window setups, and reliably reproduced in CI's headless
+      // multi-page persistent-context harness) threw a TypeError on
+      // `tab.id` BEFORE the try/catch below, as an unhandled rejection on
+      // a .then() chain with no .catch() - sendResponse never called, no
+      // error surfaced anywhere, the popup just hangs forever. Real users
+      // hitting this edge case would have seen the exact same silent
+      // nothing our CI run did.
+      if (!tab) {
+        sendResponse({ ok: false, summary: "Could not find an active tab to run against. Click on the job application tab first, then try again." });
+        return;
+      }
       if (activeTabRuns.has(tab.id)) {
         sendResponse({
           ok: false,
@@ -2448,6 +2468,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       } finally {
         activeTabRuns.delete(tab.id);
       }
+    }).catch((err) => {
+      // Last-resort net: anything else that slips past the guards above
+      // (or a chrome.tabs.query rejection itself) still gets a response
+      // instead of leaving the caller hanging with no explanation.
+      console.error("[RUN_TASK] unhandled error resolving active tab:", err);
+      sendResponse({ ok: false, summary: `Unexpected error starting the run: ${err.message}` });
     });
     return true;
   }
